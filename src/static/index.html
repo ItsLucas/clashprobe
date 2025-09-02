@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClashProbe Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .header .subtitle {
+            color: #888;
+            font-size: 1.1em;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #404040;
+        }
+
+        .summary-card h3 {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .summary-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .total .value { color: #2196F3; }
+        .alive .value { color: #4CAF50; }
+        .dead .value { color: #f44336; }
+        .success-rate .value { color: #FF9800; }
+
+    /* Removed mini charts and expandable detail sections */
+
+        .proxy-table {
+            background: #2d2d2d;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #404040;
+        }
+
+        .table-header {
+            background: #333;
+            padding: 15px;
+            border-bottom: 1px solid #404040;
+        }
+
+        .table-header h2 {
+            color: #e0e0e0;
+            margin: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #3d3d3d;
+            color: #ccc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #404040;
+            vertical-align: middle;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .status.alive {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .status.dead {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .status-icon {
+            font-size: 0.8em;
+        }
+
+        .delay {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+
+        .delay.dead {
+            color: #666;
+        }
+
+        .protocol {
+            background: #404040;
+            color: #ccc;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .last-updated {
+            text-align: center;
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border: 1px solid #4CAF50;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid #f44336;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .proxy-table {
+                overflow-x: auto;
+            }
+            
+            table {
+                min-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>ClashProbe Status</h1>
+            <div class="subtitle">Real-time proxy server monitoring</div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card total">
+                <h3>Total Servers</h3>
+                <div class="value" id="totalCount">-</div>
+            </div>
+            <div class="summary-card alive">
+                <h3>Alive</h3>
+                <div class="value" id="aliveCount">-</div>
+            </div>
+            <div class="summary-card dead">
+                <h3>Dead</h3>
+                <div class="value" id="deadCount">-</div>
+            </div>
+            <div class="summary-card success-rate">
+                <h3>Success Rate</h3>
+                <div class="value" id="successRate">-</div>
+            </div>
+        </div>
+
+
+        <div class="proxy-table">
+            <div class="table-header">
+                <h2>Proxy Servers</h2>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Protocol</th>
+                        <th>Status</th>
+                        <th>Current Delay</th>
+                        <!-- History column removed -->
+                    </tr>
+                </thead>
+                <tbody id="proxyTable">
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px; color: #888;">
+                            Waiting for data...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="last-updated">
+            Last updated: <span id="lastUpdated">Never</span>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 2000;
+
+        function connectEventSource() {
+            eventSource = new EventSource('/events');
+            
+            eventSource.onopen = function() {
+                console.log('SSE connection opened');
+                updateConnectionStatus('connected');
+                reconnectAttempts = 0;
+            };
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateUI(data);
+                } catch (e) {
+                    console.error('Failed to parse SSE data:', e);
+                }
+            };
+            
+            eventSource.onerror = function(event) {
+                console.error('SSE connection error:', event);
+                updateConnectionStatus('disconnected');
+                
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        console.log(`Reconnecting... attempt ${reconnectAttempts}`);
+                        connectEventSource();
+                    }, reconnectDelay);
+                }
+            };
+        }
+
+        function updateConnectionStatus(status) {
+            const statusElement = document.getElementById('connectionStatus');
+            statusElement.className = `connection-status ${status}`;
+            statusElement.textContent = status === 'connected' ? '🟢 Connected' : '🔴 Disconnected';
+        }
+
+        function updateUI(data) {
+            document.getElementById('totalCount').textContent = data.total;
+            document.getElementById('aliveCount').textContent = data.alive;
+            document.getElementById('deadCount').textContent = data.dead;
+            document.getElementById('successRate').textContent = `${data.success_rate.toFixed(1)}%`;
+            
+            // History tracking removed
+            
+            const tableBody = document.getElementById('proxyTable');
+            
+                if (data.proxies.length === 0) {
+                    tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px; color: #888;">
+                            No proxy data available
+                        </td>
+                    </tr>
+                `;
+                } else {
+                    let tableHTML = '';
+                    data.proxies.forEach((proxy, index) => {
+                        tableHTML += `
+                        <tr>
+                            <td>${escapeHtml(proxy.name)}</td>
+                            <td><span class="protocol">${escapeHtml(proxy.protocol)}</span></td>
+                            <td>
+                                <span class="status ${proxy.alive ? 'alive' : 'dead'}">
+                                    <span class="status-icon">${proxy.alive ? '✓' : '✗'}</span>
+                                    ${proxy.alive ? 'ALIVE' : 'DEAD'}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="delay ${proxy.alive ? '' : 'dead'}">
+                                    ${proxy.delay_ms ? `${proxy.delay_ms}ms` : '-'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                    });
+                    tableBody.innerHTML = tableHTML;
+                }
+            
+            const timestamp = new Date(data.timestamp);
+            document.getElementById('lastUpdated').textContent = timestamp.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+    // Removed history-related data structures and chart generation functions
+
+        // Initial connection
+        connectEventSource();
+        
+        // Also fetch initial data
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => updateUI(data))
+            .catch(error => console.error('Failed to fetch initial data:', error));
+    </script>
+</body>
+</html>
