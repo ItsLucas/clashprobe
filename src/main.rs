@@ -3,7 +3,8 @@ mod parser;
 mod probe;
 mod output;
 mod web;
-mod grafana_config;
+mod influxdb_config;
+mod influxdb;
 
 use anyhow::Result;
 use clap::Parser;
@@ -56,17 +57,13 @@ struct Args {
     #[arg(long, default_value = "8080")]
     web_port: u16,
 
-    /// Probe interval in seconds (web/grafana mode only)
+    /// Probe interval in seconds (web/influxdb mode only)
     #[arg(long, default_value = "30")]
     probe_interval: u64,
 
-    /// Start grafana mode
-    #[arg(long)]
-    grafana: bool,
-
     /// Grafana config path
     #[arg(long)]
-    grafana_config: String,
+    influxdb_config: String,
 }
 
 #[tokio::main]
@@ -212,5 +209,25 @@ async fn run_influxdb_mode(
     proxy_manager: &ProxyManager,
     outbound_handlers: &[AnyOutboundHandler]
 ) -> Result<()> {
-    todo!();
+    let config = crate::influxdb_config::Config::load_from_file(args.influxdb_config.as_str()).unwrap();
+    let probe_interval = Duration::from_secs(args.probe_interval);
+    let timeout = Duration::from_secs(args.timeout);
+    let influxdb_uploader = influxdb::InfluxUploader::new(&config);
+    info!("Loaded InfluxDB config from: {:?}", args.influxdb_config);
+
+    loop {
+        let start_time = Instant::now();
+        let results = test_proxies_with_clash(proxy_manager, outbound_handlers, &args.test_url, timeout).await;
+        let elapsed = start_time.elapsed();
+
+        let probe_results = build_and_sort_probe_results(outbound_handlers, &results);
+        match influxdb_uploader.upload_results(&probe_results).await {
+            Ok(_) => (),
+            Err(e) => error!("Failed to upload probe results to InfluxDB: {}", e),
+        }
+        tokio::time::sleep(probe_interval).await;
+    }
+
+    #[allow(unreachable_code)]
+    Ok(())
 }
