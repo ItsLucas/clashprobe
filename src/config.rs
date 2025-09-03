@@ -48,7 +48,7 @@ bitflags! {
         const CLI = 1;
         const WEB = 2;
         const INFLUXDB = 4;
-        const TELOXIDE = 8; // TODO: Not implemented yet
+        const TELOXIDE = 8;
     }
 }
 

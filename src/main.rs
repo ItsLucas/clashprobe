@@ -6,6 +6,7 @@ mod probe_result;
 mod reporter;
 mod subscription;
 mod web;
+mod teloxide;
 
 use anyhow::Result;
 use clap::Parser;
