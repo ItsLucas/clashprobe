@@ -1,18 +1,17 @@
-use crate::output::ProbeResult;
+use crate::probe_result::ProbeResult;
+use crate::reporter::ProbeReporter;
+use anyhow::Result;
+use async_trait::async_trait;
 use axum::{
+    Json, Router,
     extract::State,
     response::{Html, Sse},
     routing::get,
-    Json, Router,
 };
 use serde_json::json;
-use std::{
-    convert::Infallible,
-    sync::Arc,
-    time::Duration,
-};
-use tokio::sync::{broadcast, RwLock};
-use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
+use std::{convert::Infallible, sync::Arc, time::Duration};
+use tokio::sync::{RwLock, broadcast};
+use tokio_stream::{StreamExt as _, wrappers::BroadcastStream};
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, services::ServeDir};
 use tracing::{error, info};
@@ -40,7 +39,7 @@ impl AppState {
             let mut results = self.results.write().await;
             *results = new_results.clone();
         }
-        
+
         if let Err(e) = self.update_sender.send(new_results) {
             error!("Failed to broadcast update: {}", e);
         }
@@ -49,24 +48,21 @@ impl AppState {
 
 pub async fn start_web_server(port: u16) -> AppState {
     let app_state = AppState::new();
-    
+
     let app = Router::new()
         .route("/", get(index_handler))
         .route("/api/status", get(status_handler))
         .route("/events", get(sse_handler))
         .nest_service("/static", ServeDir::new("static"))
-        .layer(
-            ServiceBuilder::new()
-                .layer(CorsLayer::permissive())
-        )
+        .layer(ServiceBuilder::new().layer(CorsLayer::permissive()))
         .with_state(app_state.clone());
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .expect("Failed to bind to port");
-        
+
     info!("Web server starting on http://localhost:{}", port);
-    
+
     tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {
             error!("Web server error: {}", e);
@@ -83,7 +79,7 @@ async fn index_handler() -> Html<&'static str> {
 async fn status_handler(State(state): State<AppState>) -> Json<serde_json::Value> {
     let results = state.results.read().await;
     let alive_count = results.iter().filter(|r| r.alive).count();
-    
+
     Json(json!({
         "timestamp": chrono::Utc::now(),
         "total": results.len(),
@@ -94,7 +90,9 @@ async fn status_handler(State(state): State<AppState>) -> Json<serde_json::Value
     }))
 }
 
-async fn sse_handler(State(state): State<AppState>) -> Sse<impl futures::Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
+async fn sse_handler(
+    State(state): State<AppState>,
+) -> Sse<impl futures::Stream<Item = Result<axum::response::sse::Event, Infallible>>> {
     let receiver = state.update_sender.subscribe();
     let stream = BroadcastStream::new(receiver)
         .filter_map(|result| match result {
@@ -108,7 +106,7 @@ async fn sse_handler(State(state): State<AppState>) -> Sse<impl futures::Stream<
                     "success_rate": if results.is_empty() { 0.0 } else { (alive_count as f64 / results.len() as f64) * 100.0 },
                     "proxies": results
                 });
-                
+
                 Some(Ok(axum::response::sse::Event::default()
                     .event("update")
                     .data(data.to_string())))
@@ -124,4 +122,26 @@ async fn sse_handler(State(state): State<AppState>) -> Sse<impl futures::Stream<
             .interval(Duration::from_secs(30))
             .text("keep-alive-text"),
     )
+}
+
+pub struct WebReporter {
+    app_state: Arc<AppState>,
+}
+
+impl WebReporter {
+    pub fn new(app_state: Arc<AppState>) -> Self {
+        Self { app_state }
+    }
+}
+
+#[async_trait]
+impl ProbeReporter for WebReporter {
+    async fn report(&self, results: &[ProbeResult]) -> Result<()> {
+        self.app_state.update_results(results.to_vec()).await;
+        Ok(())
+    }
+
+    fn name(&self) -> &str {
+        "Web"
+    }
 }

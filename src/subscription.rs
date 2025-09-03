@@ -9,19 +9,23 @@ pub async fn fetch_subscription(url: &str) -> Result<String> {
         let content = tokio::fs::read_to_string(file_path).await?;
         return Ok(content);
     }
-    
+
     let client = reqwest::Client::new();
     let response = client.get(url).send().await?;
-    
+
     if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to fetch subscription: {}", response.status()));
+        return Err(anyhow::anyhow!(
+            "Failed to fetch subscription: {}",
+            response.status()
+        ));
     }
-    
+
     let content = response.text().await?;
     Ok(content)
 }
 
 pub fn is_base64(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+    s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
         && s.len() % 4 == 0
 }

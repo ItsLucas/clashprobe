@@ -1,0 +1,21 @@
+[main]
+work_mode = ["Web"]
+subscription_url = "http://your_clash_sub"
+test_url = "http://www.gstatic.com/generate_204"
+timeout = 5
+concurrent = 10
+verbose = false
+probe_interval = 30
+
+[influxdb]
+host = "http://localhost:8086"
+org = "example-org"
+token = "REPLACE_WITH_TOKEN"
+bucket = "example-bucket"
+
+[web]
+host = "127.0.0.1"
+port = 8080
+
+[teloxide]
+token = "REPLACE_WITH_TOKEN"

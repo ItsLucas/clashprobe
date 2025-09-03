@@ -1,10 +1,13 @@
 use futures::prelude::*;
-use influxdb2::models::DataPoint;
 use influxdb2::Client;
+use influxdb2::models::DataPoint;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::influxdb_config::Config;
-use crate::output::ProbeResult;
+use crate::config::Config;
+use crate::probe_result::ProbeResult;
+use crate::reporter::ProbeReporter;
+use anyhow::Result;
+use async_trait::async_trait;
 
 pub struct InfluxUploader {
     client: Client,
@@ -29,9 +32,7 @@ impl InfluxUploader {
         &self,
         results: &[ProbeResult],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_nanos() as i64;
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos() as i64;
 
         let mut points = Vec::new();
 
@@ -63,5 +64,31 @@ impl InfluxUploader {
         }
 
         Ok(())
+    }
+}
+
+pub struct InfluxDbReporter {
+    uploader: InfluxUploader,
+}
+
+impl InfluxDbReporter {
+    pub fn new(config: &Config) -> Self {
+        Self {
+            uploader: InfluxUploader::new(config),
+        }
+    }
+}
+
+#[async_trait]
+impl ProbeReporter for InfluxDbReporter {
+    async fn report(&self, results: &[ProbeResult]) -> Result<()> {
+        self.uploader
+            .upload_results(results)
+            .await
+            .map_err(|e| anyhow::anyhow!("InfluxDB upload failed: {}", e))
+    }
+
+    fn name(&self) -> &str {
+        "InfluxDB"
     }
 }
