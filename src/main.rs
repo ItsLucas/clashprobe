@@ -36,6 +36,10 @@ struct Args {
     /// Generate config
     #[arg(long, default_value = "false")]
     generate_config: bool,
+
+    /// Node name override (overrides config file setting)
+    #[arg(long)]
+    node_name: Option<String>,
 }
 
 #[tokio::main]
@@ -49,7 +53,12 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let config = crate::config::Config::load_from_file(args.config.as_str()).unwrap();
+    let mut config = crate::config::Config::load_from_file(args.config.as_str()).unwrap();
+
+    // Override node name from CLI if provided
+    if let Some(node_name) = args.node_name {
+        config.influxdb.node_name = node_name;
+    }
 
     // Initialize logging
     let level = if config.main.verbose {

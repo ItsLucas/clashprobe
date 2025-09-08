@@ -18,6 +18,7 @@ pub struct InfluxDbConfig {
     pub org: String,
     pub token: String,
     pub bucket: String,
+    pub node_name: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -181,6 +182,7 @@ impl Default for InfluxDbConfig {
             org: "example-org".into(),
             token: "REPLACE_WITH_TOKEN".into(),
             bucket: "example-bucket".into(),
+            node_name: "node-1".into(),
         }
     }
 }
