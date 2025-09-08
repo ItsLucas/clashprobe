@@ -12,6 +12,7 @@ use async_trait::async_trait;
 pub struct InfluxUploader {
     client: Client,
     bucket: String,
+    node_name: String,
 }
 
 impl InfluxUploader {
@@ -25,6 +26,7 @@ impl InfluxUploader {
         Self {
             client,
             bucket: config.influxdb.bucket.clone(),
+            node_name: config.influxdb.node_name.clone(),
         }
     }
 
@@ -41,6 +43,7 @@ impl InfluxUploader {
                 DataPoint::builder("probe")
                     .tag("name", &result.name)
                     .tag("protocol", &result.protocol)
+                    .tag("node", &self.node_name)
                     .field("alive", true)
                     .field("delay_ms", result.delay_ms.unwrap() as i64)
                     .timestamp(timestamp)
@@ -49,6 +52,7 @@ impl InfluxUploader {
                 DataPoint::builder("probe")
                     .tag("name", &result.name)
                     .tag("protocol", &result.protocol)
+                    .tag("node", &self.node_name)
                     .field("alive", false)
                     .field("delay_ms", 99999)
                     .timestamp(timestamp)

@@ -18,6 +18,8 @@ pub struct InfluxDbConfig {
     pub org: String,
     pub token: String,
     pub bucket: String,
+    #[serde(default = "default_node_name")]
+    pub node_name: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -181,6 +183,7 @@ impl Default for InfluxDbConfig {
             org: "example-org".into(),
             token: "REPLACE_WITH_TOKEN".into(),
             bucket: "example-bucket".into(),
+            node_name: default_node_name(),
         }
     }
 }
@@ -211,4 +214,8 @@ impl Default for Config {
             teloxide: TeloxideConfig::default(),
         }
     }
+}
+
+fn default_node_name() -> String {
+    "default".to_string()
 }
