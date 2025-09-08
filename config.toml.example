@@ -12,6 +12,7 @@ host = "http://localhost:8086"
 org = "example-org"
 token = "REPLACE_WITH_TOKEN"
 bucket = "example-bucket"
+node_name = "region-xyz-node-a"
 
 [web]
 host = "127.0.0.1"
