@@ -2,6 +2,11 @@
 name = "clashprobe"
 version = "0.1.0"
 edition = "2024"
+authors = ["ItsLucas <lucas@itslucas.dev>"]
+license = "MIT"
+description = "Protocol-aware Clash subscription server health checking tool"
+homepage = "https://github.com/ItsLucas/clashprobe"
+repository = "https://github.com/ItsLucas/clashprobe"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
@@ -28,3 +33,25 @@ influxdb2 = "0.5.2"
 bitflags = { version = "2.9.4", features = ["serde"] }
 async-trait = "0.1.89"
 frankenstein = { version = "0.44.0", features = ["client-reqwest"] }
+
+[package.metadata.deb]
+maintainer = "ItsLucas <lucas@itslucas.dev>"
+copyright = "2025, ItsLucas <lucas@itslucas.dev>"
+extended-description = """
+ClashProbe is a protocol-aware Clash subscription server health checking tool \
+that validates proxy protocols instead of just testing HTTP connectivity. \
+It uses clash-rs internals for proper protocol connection establishment.
+"""
+depends = "$auto"
+section = "net"
+priority = "optional"
+assets = [
+    ["target/release/clashprobe", "usr/bin/", "755"],
+    ["config.toml.example", "etc/clashprobe/config.toml.example", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/clashprobe", dest = "/usr/bin/clashprobe", mode = "755" },
+    { source = "config.toml.example", dest = "/etc/clashprobe/config.toml.example", mode = "644" },
+]
