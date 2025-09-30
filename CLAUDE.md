@@ -140,6 +140,15 @@ When seeing code, immediately perform three-layer judgment:
 
 ClashProbe is a proper Clash subscription server health checking tool that validates proxy protocols instead of just testing HTTP connectivity. It replaces the garbage HTTP-based testing approach with actual protocol connection establishment using clash-rs internals.
 
+**Build Requirements:**
+- Rust nightly toolchain (enforced via `rust-toolchain.toml`)
+- System dependencies: cmake, clang, llvm, pkg-config, libssl-dev, protobuf-compiler, perl, golang
+
+**Distribution:**
+- GitHub Actions CI/CD for automated DEB/RPM package builds
+- Currently supports x86_64 only (aarch64 blocked by Ubuntu repo limitations)
+- Releases published automatically on git tags via `softprops/action-gh-release`
+
 ### The Problem We Solved
 
 **Original Implementation (Garbage):**
@@ -235,9 +244,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
 
-# Web server dependencies (NEW)
+# Web server dependencies
 axum = "0.8.4"
-tower = "0.5.2" 
+tower = "0.5.2"
 tower-http = { version = "0.6.6", features = ["fs", "cors"] }
 tokio-stream = { version = "0.1.17", features = ["sync"] }
 chrono = { version = "0.4.41", features = ["serde"] }
@@ -246,15 +255,37 @@ chrono = { version = "0.4.41", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json"] }
 serde_yaml = "0.9"
 base64 = "0.22"
+
+# Monitoring & notifications
+influxdb2 = "0.5.2"
+frankenstein = { version = "0.44.0", features = ["client-reqwest"] }
+toml = "0.9.5"
 ```
 
 **Why these features:**
 - `shadowsocks`: Enable shadowsocks protocol support
-- `zero_copy`: Performance optimization 
+- `zero_copy`: Performance optimization
 - `aws-lc-rs`: TLS crypto provider (required for HTTPS testing)
 - `fs`: Static file serving for web interface
 - `cors`: Cross-origin requests for API
 - `sync`: Broadcast channels for SSE
+
+**Package Metadata (Cargo.toml):**
+```toml
+[package.metadata.deb]
+maintainer = "ItsLucas <lucas@itslucas.dev>"
+section = "net"
+assets = [
+    ["target/release/clashprobe", "usr/bin/", "755"],
+    ["config.toml.example", "etc/clashprobe/config.toml.example", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/clashprobe", dest = "/usr/bin/clashprobe", mode = "755" },
+    { source = "config.toml.example", dest = "/etc/clashprobe/config.toml.example", mode = "644" },
+]
+```
 
 ## Usage
 
@@ -386,3 +417,58 @@ Following Linus's principles:
 - **Simple data flow**: URL → Config → Handler → Test → Result
 - **Zero special cases**: Same testing logic for all protocols
 - **Fail fast**: Early validation of configs before testing
+
+## CI/CD Pipeline
+
+### GitHub Actions Workflow
+
+**Location:** `.github/workflows/release.yml`
+
+**Trigger:** Git tags matching `v*` (e.g., `v0.0.1`) or manual dispatch
+
+**Jobs:**
+1. **build-deb**: Build Debian packages for x86_64
+   - Uses `cargo-deb` for packaging
+   - Installs all build dependencies (cmake, clang, protobuf, openssl, etc.)
+   - Uploads `.deb` artifacts
+
+2. **build-rpm**: Build RPM packages for x86_64
+   - Uses `cargo-generate-rpm` for packaging
+   - Installs all build dependencies + rpm tools
+   - Uploads `.rpm` artifacts
+
+3. **create-release**: Create GitHub Release
+   - Downloads all artifacts from previous jobs
+   - Creates release with auto-generated notes
+   - Attaches all `.deb` and `.rpm` files
+
+**Current Limitations:**
+- **x86_64 only**: aarch64 cross-compilation disabled due to Ubuntu repository limitations
+  - Ubuntu's security repos don't serve arm64 packages
+  - ports.ubuntu.com has connectivity issues in GitHub runners
+  - Future: Consider using Fedora/RHEL images for native aarch64 builds
+
+**Build Environment:**
+- Runner: `ubuntu-latest`
+- Rust: nightly (via `rust-toolchain.toml`)
+- Cache: Cargo registry, git index, and target directory for faster builds
+
+**Release Process:**
+```bash
+# Tag a new version
+git tag v0.1.0
+git push origin v0.1.0
+
+# GitHub Actions automatically:
+# 1. Builds DEB and RPM packages
+# 2. Creates GitHub Release
+# 3. Uploads packages as release assets
+```
+
+**Monitoring Builds:**
+```bash
+# Using GitHub CLI
+gh run list
+gh run view <run-id>
+gh run view <run-id> --log-failed
+```
